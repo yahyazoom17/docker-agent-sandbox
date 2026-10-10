@@ -1,63 +1,54 @@
 from crewai import Agent, Task, Crew, Process, LLM
-from sandbox import AgentComputer, ComputerTool
-import os
+from tools import agent_sandbox, RunSandboxCommand
 
 agent_llm = LLM(
-    model="openrouter/poolside/laguna-xs-2.1:free",
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.environ.get("OPENROUTER_API_KEY"),
+    model="ollama/ornith:9b",
+    base_url="http://localhost:11434"
+    # api_key=os.environ.get("OPENROUTER_API_KEY"),
 )
-
-backend_pc = AgentComputer("backend")
-frontend_pc = AgentComputer("frontend")
-
-backend = Agent(
-    role="Backend Developer",
-    goal="Build and test the backend independently",
-    backstory="You are a developer with your own Linux computer.",
-    tools=[ComputerTool(computer=backend_pc)],
-    verbose=True,
-    llm=agent_llm
-)
-
-frontend = Agent(
-    role="Frontend Developer",
-    goal="Build and test the frontend independently",
-    backstory="You are a frontend developer with your own Linux computer.",
-    tools=[ComputerTool(computer=frontend_pc)],
-    verbose=True,
-    llm=agent_llm
-)
-
-tasks = [
-    Task(
-        description=(
-            "Create and test a small Python fastapi backend in your "
-            "own /workspace directory. Report the files created and the test results. Give me the link to the working backend after testing it."
-        ),
-        expected_output="Working backend source and test results.",
-        agent=backend,
-    ),
-    Task(
-        description=(
-            "Create a simple react frontend"
-            "in your own /workspace directory. Report the files created."
-            "after testing the frontend, give me the link to the working frontend."
-        ),
-        expected_output="Working frontend source files.",
-        agent=frontend,
-    ),
-]
 
 try:
+    coding_agent = Agent(
+        role="Python Coding Agent",
+        goal=(
+            "Complete coding tasks by writing code, executing it "
+            "inside Docker, checking errors, and fixing problems."
+        ),
+        backstory=(
+            "You are a software engineer. All code execution "
+            "must happen using the Docker sandbox tool."
+        ),
+        tools=[RunSandboxCommand()],
+        verbose=True,
+        allow_delegation=False,
+        llm=agent_llm,
+    )
+
+    task = Task(
+        description="""
+        Create a Python file named hello.py in /workspace.
+        The file should print 'Hello from Docker Sandbox!'.
+
+        Execute the file using Python.
+        If there are errors, fix them and run it again.
+        Report the final output and the commands used.
+        """,
+        expected_output=(
+            "A summary of the created file, execution result, "
+            "and any fixes made."
+        ),
+        agent=coding_agent,
+    )
+
     crew = Crew(
-        agents=[backend, frontend],
-        tasks=tasks,
+        agents=[coding_agent],
+        tasks=[task],
         process=Process.sequential,
         verbose=True,
     )
+
     result = crew.kickoff()
     print(result)
+
 finally:
-    backend_pc.close()
-    frontend_pc.close()
+    agent_sandbox.close()
