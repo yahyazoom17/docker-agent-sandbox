@@ -1,29 +1,34 @@
-from dotenv import load_dotenv
-from pydantic import BaseModel, Field
-from crewai.tools import BaseTool
-from sandbox import DockerSandbox
+from crewai.tools import tool
 
-load_dotenv()
+class ComputerManager:
+    def __init__(self):
+        self.computers = {}
 
-agent_sandbox = DockerSandbox()
+    def create(self, agent_id: str, **kwargs):
+        if agent_id in self.computers:
+            return self.computers[agent_id]
 
-class RunCommandInput(BaseModel):
-    command: str = Field(
-        ...,
-        description=(
-            "A shell command to execute in the isolated "
-            "Docker workspace. Use /workspace for files."
-        ),
+        computer = AgentComputer(agent_id, **kwargs)
+        self.computers[agent_id] = computer
+        return computer
+
+    def get(self, agent_id: str):
+        if agent_id not in self.computers:
+            raise KeyError(f"No computer assigned to {agent_id}")
+        return self.computers[agent_id]
+
+
+computer_manager = ComputerManager()
+
+@tool("computer_terminal")
+def computer_terminal(agent_id: str, command: str) -> str:
+    """Execute an authorized shell command in the assigned agent's computer."""
+    computer = computer_manager.get(agent_id)
+
+    result = computer.run(command)
+
+    return (
+        f"Exit code: {result['exit_code']}\n"
+        f"STDOUT:\n{result['stdout']}\n"
+        f"STDERR:\n{result['stderr']}"
     )
-
-class RunSandboxCommand(BaseTool):
-    name: str = "Run Docker Sandbox Command"
-    description: str = (
-        "Execute a shell command inside an isolated Docker "
-        "container. Use it to create files, run Python code, "
-        "and execute tests. Returns stdout, stderr, and exit code."
-    )
-    args_schema: type[BaseModel] = RunCommandInput
-
-    def _run(self, command: str) -> str:
-        return agent_sandbox.run(command)
