@@ -9,9 +9,10 @@ load_dotenv()
 
 #* 0. Initialize the LLM with OpenRouter
 openrouter_llm = LLM(
-    model="openrouter/cohere/north-mini-code:free",
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.environ.get("OPENROUTER_API_KEY")
+    model="lm_studio/nvidia/nemotron-3-nano-4b",
+    base_url="http://localhost:1234/v1",
+    api_key="lmstudio",
+    custom_openai=True
 )
 
 #* 1. Create an isolated computer for each agent
@@ -66,6 +67,7 @@ coding_agent = Agent(
     verbose=True,
     allow_delegation=False,
     llm=openrouter_llm,
+    reasoning=True
 )
 
 coding_agent_2 = Agent(
@@ -84,6 +86,7 @@ coding_agent_2 = Agent(
     verbose=True,
     allow_delegation=False,
     llm=openrouter_llm,
+    reasoning=True
 )
 
 
@@ -135,13 +138,18 @@ task_2 = Task(
 crew = Crew(
     agents=[coding_agent, coding_agent_2],
     tasks=[task_1, task_2],
-    process=Process.sequential,
+    process=Process.hierarchical,
     verbose=True,
+    manager_llm=openrouter_llm,
 )
 
 try:
     result = crew.kickoff()
     print(result)
+except Exception as e:
+    print(f"An error occurred during task execution: {e}")
+    computer_1.close()
+    computer_2.close()
 finally:
     #* Stop the agents' containers after the tasks are complete
     computer_1.close()

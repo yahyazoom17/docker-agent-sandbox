@@ -4,15 +4,13 @@ import docker
 from docker.errors import NotFound, APIError
 
 class AgentComputer:
-    IMAGE = "agent-sandbox:latest"
+    IMAGE = "crewai-code-sandbox:latest"
 
     def __init__(
         self,
         agent_id: str,
         git_name: str = "agent170207",
         git_email: str = "openaichatgpt839@gmail.com",
-        memory_limit: str = "1g",
-        cpu_limit: float = 1.0,
     ):
         if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,47}", agent_id):
             raise ValueError("Invalid agent_id")
@@ -30,7 +28,7 @@ class AgentComputer:
 
         # Reuse the container if it already exists.
         self.container = self.client.containers.run(
-            image="agent-sandbox:latest",
+            image="crewai-code-sandbox:latest",
             name=f"computer-{agent_id}",
             command=["sleep", "infinity"],
             detach=True,
@@ -94,9 +92,9 @@ class AgentComputer:
             self.container.reload()
 
             if self.container.status == "running":
-                self.container.stop(timeout=10)
+                self.container.remove(force=True)
 
-            print(f"Container {self.name} stopped.")
+            print(f"Container {self.name} deleted.")
         except docker.errors.NotFound:
             print(f"Container {self.name} no longer exists.")
         
